@@ -1,0 +1,33 @@
+seed: 42
+
+data:
+  root: data/emnist          # torchvision downloads EMNIST here on first run
+
+model:
+  name: small_cnn            # tiny_cnn | small_cnn
+  in_channels: 1
+  num_classes: 26
+  img_size: 64
+  mean: 0.5
+  std: 0.5
+  dropout: 0.30
+
+train:
+  batch_size: 256
+  num_workers: 4
+  epochs: 30
+  lr: 0.001
+  weight_decay: 0.0001
+  amp: true                  # mixed precision — only active on CUDA
+  early_patience: 8
+  save_dir: outputs/checkpoints
+
+infer:
+  min_confidence: 0.60       # flag for human review below this threshold
+  batch_size: 256
+
+export:
+  after_train: true
+  onnx_opset: 17
+  onnx_path: outputs/exports/alphabet_model.onnx
+  torchscript_path: outputs/exports/alphabet_model.ts
