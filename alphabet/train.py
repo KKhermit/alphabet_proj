@@ -11,7 +11,7 @@ import torch
 import torch.nn as nn
 from sklearn.metrics import accuracy_score, classification_report
 
-from alphabet.dataset import ALPHABET_CLASSES, build_dataloaders
+from alphabet.dataset import CHAR_CLASSES, build_dataloaders
 from alphabet.export import export_from_config
 from alphabet.model import build_model, count_parameters
 from alphabet.utils import ensure_dir, load_yaml, save_json, set_seed, write_csv
@@ -99,7 +99,7 @@ def validate(
     accuracy = float(accuracy_score(y_true, y_pred))
     report = classification_report(
         y_true, y_pred,
-        target_names=ALPHABET_CLASSES,
+        target_names=CHAR_CLASSES,
         output_dict=True,
         zero_division=0,
     )

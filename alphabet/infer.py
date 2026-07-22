@@ -8,11 +8,11 @@ import numpy as np
 import torch
 from PIL import Image
 
-from alphabet.dataset import ALPHABET_CLASSES, preprocess_crop_for_inference
+from alphabet.dataset import CHAR_CLASSES, preprocess_crop_for_inference
 
 
 class OnnxBackend:
-    """ONNX runtime backend for the 26-class alphabet model."""
+    """ONNX runtime backend for the 36-class digit+letter model."""
 
     def __init__(self, model_path: str | Path) -> None:
         try:
@@ -25,7 +25,7 @@ class OnnxBackend:
         self.output_name = self.session.get_outputs()[0].name
 
     def predict(self, batch_tensor: torch.Tensor) -> np.ndarray:
-        """Return softmax probabilities, shape (batch, 26)."""
+        """Return softmax probabilities, shape (batch, 36)."""
         arr = batch_tensor.detach().cpu().numpy().astype(np.float32)
         logits = self.session.run([self.output_name], {self.input_name: arr})[0]
         # numerically stable softmax
@@ -44,14 +44,14 @@ def predict_crops(
     batch_size: int = 256,
 ) -> list[dict[str, Any]]:
     """
-    Run inference on a list of pre-cropped BGR letter images.
+    Run inference on a list of pre-cropped BGR images (digits or letters).
 
     Returns one dict per crop with:
-      letter          — predicted character ('A'–'Z')
-      prediction_index — 0–25
-      confidence      — softmax probability of the top class
-      probabilities   — full 26-element list
-      flag            — True when confidence < min_confidence (needs human review)
+      character        — predicted character ('0'–'9' or 'A'–'Z')
+      prediction_index — 0–35
+      confidence       — softmax probability of the top class
+      probabilities    — full 36-element list
+      flag             — True when confidence < min_confidence (needs human review)
     """
     tensors: list[torch.Tensor] = []
     for crop in crops:
@@ -63,14 +63,14 @@ def predict_crops(
         batch = torch.stack(tensors[i : i + batch_size], dim=0)
         all_probs.append(backend.predict(batch))
 
-    probs_matrix = np.concatenate(all_probs, axis=0) if all_probs else np.zeros((0, 26))
+    probs_matrix = np.concatenate(all_probs, axis=0) if all_probs else np.zeros((0, 36))
 
     results: list[dict[str, Any]] = []
     for probs in probs_matrix:
         idx = int(probs.argmax())
         confidence = float(probs[idx])
         results.append({
-            "letter": ALPHABET_CLASSES[idx],
+            "character": CHAR_CLASSES[idx],
             "prediction_index": idx,
             "confidence": confidence,
             "probabilities": probs.tolist(),
