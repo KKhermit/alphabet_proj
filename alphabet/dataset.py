@@ -17,8 +17,9 @@ ALPHABET_CLASSES = CHAR_CLASSES
 
 
 def _fix_emnist_orientation(t: torch.Tensor) -> torch.Tensor:
-    # EMNIST images are stored transposed; this corrects to normal orientation.
-    return t.permute(0, 2, 1).flip(1)
+    # EMNIST images are stored transposed relative to natural writing orientation.
+    # The correct fix is a plain transpose (permute spatial dims), not a rotation.
+    return t.permute(0, 2, 1)
 
 
 def _build_transform(

@@ -14,7 +14,7 @@ metrics:
   - accuracy
 ---
 
-# Alpha-Numeric Classifier (0–9, A–Z)
+# Alpha-Numeric Classifier (0–9, A–Z, blank)
 
 A lightweight CNN that classifies grayscale images of handwritten digits (0–9), uppercase letters (A–Z), and blank boxes, trained on a combined EMNIST Digits + Letters dataset with synthetic blank images.
 
@@ -23,7 +23,7 @@ A lightweight CNN that classifies grayscale images of handwritten digits (0–9)
 | Property | Value |
 |---|---|
 | Architecture | SmallAlphaNet (depthwise-separable CNN) |
-| Parameters | 37,658 |
+| Parameters | 38,373 |
 | Input | 64 × 64 grayscale image |
 | Output | 37-class softmax (0–9, A–Z, blank) |
 | Format | ONNX (opset 17) |
@@ -31,7 +31,7 @@ A lightweight CNN that classifies grayscale images of handwritten digits (0–9)
 
 The architecture uses depthwise-separable convolutions (like MobileNet) to stay small and fast while still achieving strong accuracy.
 
-## Training
+## Training Configuration
 
 | Setting | Value |
 |---|---|
@@ -42,6 +42,7 @@ The architecture uses depthwise-separable convolutions (like MobileNet) to stay 
 | Scheduler | CosineAnnealingLR |
 | Batch size | 256 |
 | Max epochs | 30 |
+| Early stopping | patience=8 |
 | Augmentation | RandomAffine, RandomPerspective, ColorJitter, GaussianBlur, RandomErasing |
 
 ## Classes
@@ -54,7 +55,9 @@ The architecture uses depthwise-separable convolutions (like MobileNet) to stay 
 
 ## Per-class Performance
 
-*To be updated after training with the new 37-class model.*
+*To be updated after retraining with the new 37-class dataset.*
+
+The previous 26-class letter-only model achieved **94.1% val accuracy** on EMNIST Letters. Hardest classes were I (F1=0.747) and L (F1=0.754) due to visual ambiguity in handwriting.
 
 ## Usage
 
@@ -90,3 +93,7 @@ python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 python main.py train --config config/config.yaml
 ```
+
+## License
+
+MIT
