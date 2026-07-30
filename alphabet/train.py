@@ -11,7 +11,7 @@ import torch
 import torch.nn as nn
 from sklearn.metrics import accuracy_score, classification_report
 
-from alphabet.dataset import CHAR_CLASSES, build_dataloaders
+from alphabet.dataset import CHAR_CLASSES, build_dataloaders, compute_class_weights
 from alphabet.export import export_from_config
 from alphabet.model import build_model, count_parameters
 from alphabet.utils import ensure_dir, load_yaml, save_json, set_seed, write_csv
@@ -147,7 +147,10 @@ def train_from_config(config_path: str | Path, device: str | None = None) -> dic
     print(f"Training on {device} | "
           f"{len(train_loader.dataset)} train / {len(val_loader.dataset)} val samples")
 
-    criterion = nn.CrossEntropyLoss()
+    class_weights = compute_class_weights(
+        train_loader.dataset, num_classes=int(cfg["model"]["num_classes"])
+    ).to(device)
+    criterion = nn.CrossEntropyLoss(weight=class_weights)
     optimizer = torch.optim.AdamW(
         model.parameters(),
         lr=float(cfg["train"].get("lr", 1e-3)),

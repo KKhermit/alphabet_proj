@@ -2,13 +2,13 @@ seed: 42
 
 data:
   root: data/emnist          # torchvision downloads EMNIST here on first run
-  blank_train: 10000         # synthetic blank images added to training set
+  blank_train: 14000         # synthetic blank images added to training set
   blank_val: 2000            # synthetic blank images added to validation set
 
 model:
   name: small_cnn            # tiny_cnn | small_cnn
   in_channels: 1
-  num_classes: 37
+  num_classes: 63
   img_size: 64
   mean: 0.5
   std: 0.5

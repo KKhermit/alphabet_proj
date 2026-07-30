@@ -8,9 +8,14 @@ from torch.utils.data import ConcatDataset, DataLoader, Dataset
 from torchvision import transforms
 from torchvision.datasets import EMNIST
 
-# 37 classes: 0-9 (indices 0-9), A-Z (indices 10-35), blank (index 36)
-CHAR_CLASSES = list("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ") + ["blank"]
-BLANK_CLASS_INDEX = 36
+# 63 classes: digits 0-9 (0-9), uppercase A-Z (10-35), lowercase a-z (36-61), blank (62)
+CHAR_CLASSES = (
+    list("0123456789")
+    + list("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+    + list("abcdefghijklmnopqrstuvwxyz")
+    + ["blank"]
+)
+BLANK_CLASS_INDEX = 62
 
 # Keep for backwards compatibility
 ALPHABET_CLASSES = CHAR_CLASSES
@@ -87,21 +92,22 @@ def _build_combined_dataset(
     blank_size: int = 10000,
 ) -> ConcatDataset:
     """
-    Concatenates EMNIST 'digits', 'letters', and synthetic blanks into a 37-class dataset.
+    EMNIST byclass (62 classes) plus synthetic blanks = 63 total classes.
 
-    Digit labels (0-9) → indices 0-9.
-    Letter labels (1-26, A-Z) → indices 10-35.
-    Blank (synthetic white images) → index 36.
+    byclass labels 0-61 map directly to class indices:
+      0-9   → digits 0-9
+      10-35 → uppercase A-Z
+      36-61 → lowercase a-z
+    Blank (synthetic) → index 62.
     """
     transform = _build_transform(img_size, augment, mean, std)
-    digit_ds = _EMNISTSplitDataset(root, "digits", train, lambda l: l, transform)
-    letter_ds = _EMNISTSplitDataset(root, "letters", train, lambda l: l - 1 + 10, transform)
+    byclass_ds = _EMNISTSplitDataset(root, "byclass", train, lambda l: l, transform)
     blank_ds = BlankDataset(blank_size, img_size, mean, std, augment=augment)
-    return ConcatDataset([digit_ds, letter_ds, blank_ds])
+    return ConcatDataset([byclass_ds, blank_ds])
 
 
 class BlankDataset(Dataset):
-    """Synthetic white images representing blank/empty boxes (class index 36)."""
+    """Synthetic images representing blank/empty boxes (class index 62)."""
 
     def __init__(self, size: int, img_size: int, mean: float, std: float, augment: bool = False) -> None:
         self.size = size
@@ -123,6 +129,31 @@ class BlankDataset(Dataset):
             "image": img,
             "label": torch.tensor(BLANK_CLASS_INDEX, dtype=torch.long),
         }
+
+
+def compute_class_weights(dataset: ConcatDataset, num_classes: int) -> torch.Tensor:
+    """Inverse-frequency weights for CrossEntropyLoss, normalized so the mean weight = 1.
+
+    Blank gets a hard minimum weight of 3.0 regardless of sample count, because blank
+    images are visually similar to character backgrounds (both near -1.0 normalized) and
+    frequency-based weighting alone is not sufficient for the model to learn this class.
+
+    Requires _EMNISTSplitDataset sub-datasets to use an identity label mapping
+    (i.e. byclass, where targets are already class indices 0-61).
+    """
+    counts = torch.zeros(num_classes, dtype=torch.float32)
+    for sub_ds in dataset.datasets:
+        if isinstance(sub_ds, _EMNISTSplitDataset):
+            bc = torch.bincount(sub_ds.emnist.targets.long(), minlength=num_classes).float()
+            counts += bc
+        elif isinstance(sub_ds, BlankDataset):
+            counts[BLANK_CLASS_INDEX] += float(len(sub_ds))
+    counts = counts.clamp(min=1.0)
+    weights = 1.0 / counts
+    weights = weights * (num_classes / weights.sum())
+    # Blank is visually hard to distinguish from character backgrounds; give it a floor.
+    weights[BLANK_CLASS_INDEX] = max(float(weights[BLANK_CLASS_INDEX]), 3.0)
+    return weights
 
 
 def _collate(batch: list[dict[str, Any]]) -> dict[str, Any]:
@@ -190,6 +221,8 @@ def preprocess_crop_for_inference(
 __all__ = [
     "CHAR_CLASSES",
     "ALPHABET_CLASSES",
+    "BLANK_CLASS_INDEX",
     "build_dataloaders",
+    "compute_class_weights",
     "preprocess_crop_for_inference",
 ]

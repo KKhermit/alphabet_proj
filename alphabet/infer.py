@@ -12,7 +12,7 @@ from alphabet.dataset import CHAR_CLASSES, preprocess_crop_for_inference
 
 
 class OnnxBackend:
-    """ONNX runtime backend for the 36-class digit+letter model."""
+    """ONNX runtime backend for the alphanumeric classifier."""
 
     def __init__(self, model_path: str | Path) -> None:
         try:
@@ -25,7 +25,7 @@ class OnnxBackend:
         self.output_name = self.session.get_outputs()[0].name
 
     def predict(self, batch_tensor: torch.Tensor) -> np.ndarray:
-        """Return softmax probabilities, shape (batch, 36)."""
+        """Return softmax probabilities, shape (batch, num_classes)."""
         arr = batch_tensor.detach().cpu().numpy().astype(np.float32)
         logits = self.session.run([self.output_name], {self.input_name: arr})[0]
         # numerically stable softmax
@@ -47,10 +47,10 @@ def predict_crops(
     Run inference on a list of pre-cropped BGR images (digits or letters).
 
     Returns one dict per crop with:
-      character        — predicted character ('0'–'9' or 'A'–'Z')
-      prediction_index — 0–35
+      character        — predicted character ('0'–'9', 'A'–'Z', 'a'–'z', or 'blank')
+      prediction_index — 0–62
       confidence       — softmax probability of the top class
-      probabilities    — full 36-element list
+      probabilities    — full probability list
       flag             — True when confidence < min_confidence (needs human review)
     """
     tensors: list[torch.Tensor] = []
@@ -63,7 +63,7 @@ def predict_crops(
         batch = torch.stack(tensors[i : i + batch_size], dim=0)
         all_probs.append(backend.predict(batch))
 
-    probs_matrix = np.concatenate(all_probs, axis=0) if all_probs else np.zeros((0, 36))
+    probs_matrix = np.concatenate(all_probs, axis=0) if all_probs else np.zeros((0, len(CHAR_CLASSES)))
 
     results: list[dict[str, Any]] = []
     for probs in probs_matrix:
